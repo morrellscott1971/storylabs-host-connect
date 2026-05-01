@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect, useCallback } from "react";
 
 // ── API CLIENT (calls our Vercel proxy, not OfficeRND directly) ───────────────
 async function apiGet(endpoint, params = {}) {
-  const url = new URL("/api/officernd", window.location.origin);
+  const url = new URL("https://storylabs-host-connect.onrender.com/api/officernd");
   url.searchParams.set("endpoint", endpoint);
   Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
   const res = await fetch(url.toString());
