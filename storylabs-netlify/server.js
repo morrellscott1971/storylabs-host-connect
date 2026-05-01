@@ -14,7 +14,7 @@ async function getAccessToken() {
     grant_type: "client_credentials",
     client_id: CLIENT_ID,
     client_secret: CLIENT_SECRET,
-    scope: "officernd.api.access",
+    scope: "officernd.api",
   });
   const res = await fetch("https://identity.officernd.com/oauth/token", {
     method: "POST",
