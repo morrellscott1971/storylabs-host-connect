@@ -13,6 +13,7 @@ async function getAccessToken() {
   if (cachedToken && tokenExpiry > now) return cachedToken;
 
   const body = "grant_type=client_credentials&client_id=" + CLIENT_ID + "&client_secret=" + CLIENT_SECRET;
+  console.log("AUTH ATTEMPT - client_id starts with:", CLIENT_ID ? CLIENT_ID.substring(0,4) : "MISSING");
 
   const res = await fetch("https://identity.officernd.com/oauth/token", {
     method: "POST",
