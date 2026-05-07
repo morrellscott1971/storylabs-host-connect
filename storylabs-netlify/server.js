@@ -12,7 +12,7 @@ async function getAccessToken() {
   const now = Date.now();
   if (cachedToken && tokenExpiry > now) return cachedToken;
 
-  const body = "grant_type=client_credentials&client_id=" + CLIENT_ID + "&client_secret=" + CLIENT_SECRET;
+  const body = "grant_type=client_credentials&client_id=" + CLIENT_ID + "&client_secret=" + CLIENT_SECRET + "&scope=flex.space.bookings.read%20flex.space.passes.read%20flex.community.visits.read";
   console.log("AUTH ATTEMPT - client_id starts with:", CLIENT_ID ? CLIENT_ID.substring(0,4) : "MISSING");
 
   const res = await fetch("https://identity.officernd.com/oauth/token", {
