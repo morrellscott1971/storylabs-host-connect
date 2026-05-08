@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useCallback } from "react";
 
-// ── API CLIENT (calls our Vercel proxy, not OfficeRND directly) ───────────────
+// ── API CLIENT ────────────────────────────────────────────────────────────────
 async function apiGet(endpoint, params = {}) {
   const url = new URL("https://storylabs-host-connect.onrender.com/api/officernd");
   url.searchParams.set("endpoint", endpoint);
@@ -8,35 +8,41 @@ async function apiGet(endpoint, params = {}) {
   const res = await fetch(url.toString());
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new Error(err.error || `Request failed (${res.status})`);
+    throw new Error(err.error || "Request failed (" + res.status + ")");
   }
   return res.json();
 }
 
 async function fetchBookings(startDate, endDate) {
-  const data = await apiGet("bookings", { startDate, endDate });
+  const data = await apiGet("bookings/occurrences", {
+    start: startDate + "T00:00:00.000Z",
+    end: endDate + "T23:59:59.000Z",
+  });
   const arr = Array.isArray(data) ? data : data.results || [];
   return arr.map(b => ({
     id: b._id,
-    room: b.resource?.name || b.resourceName || "Room",
-    member: b.member?.name || b.memberName || "Guest",
-    company: b.team?.name || "",
-    start: b.start ? new Date(b.start).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false }) : "",
-    end: b.end ? new Date(b.end).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false }) : "",
-    date: b.start ? b.start.split("T")[0] : startDate,
-    status: b.status === "cancelled" ? "cancelled" : "confirmed",
+    room: b.summary || "Room",
+    member: b.member || "",
+    company: b.team || "",
+    start: b.start && b.start.dateTime ? new Date(b.start.dateTime).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true, timeZone: "America/Los_Angeles" }) : "",
+    end: b.end && b.end.dateTime ? new Date(b.end.dateTime).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true, timeZone: "America/Los_Angeles" }) : "",
+    date: b.start && b.start.dateTime ? new Date(b.start.dateTime).toLocaleDateString("en-CA", { timeZone: "America/Los_Angeles" }) : startDate,
+    status: "confirmed",
   }));
 }
 
 async function fetchDayPasses(startDate, endDate) {
-  const data = await apiGet("day-passes", { startDate, endDate });
+  const data = await apiGet("passes", {
+    startDate: startDate,
+    endDate: endDate,
+  });
   const arr = Array.isArray(data) ? data : data.results || [];
   return arr.map(p => ({
     id: p._id,
     name: p.member?.name || p.memberName || "Visitor",
     email: p.member?.email || p.memberEmail || "",
     date: p.date ? p.date.split("T")[0] : startDate,
-    checkIn: p.checkedInAt ? new Date(p.checkedInAt).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false }) : null,
+    checkIn: p.checkedInAt ? new Date(p.checkedInAt).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true, timeZone: "America/Los_Angeles" }) : null,
     status: p.checkedInAt ? "checked-in" : "booked",
   }));
 }
@@ -93,11 +99,11 @@ const Spinner = () => (
 function BookingRow({ b }) {
   const cancelled = b.status === "cancelled";
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 20px", borderBottom: `1px solid ${c.border}`, opacity: cancelled ? 0.5 : 1 }}>
+    <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 20px", borderBottom: "1px solid " + c.border, opacity: cancelled ? 0.5 : 1 }}>
       <div style={{ width: 4, height: 36, borderRadius: 2, background: cancelled ? "#ccc" : c.accent, flexShrink: 0 }} />
       <div style={{ flex: 1 }}>
         <div style={{ fontSize: 14, fontWeight: 600 }}>{b.room}</div>
-        <div style={{ fontSize: 12, color: c.muted }}>{b.member}{b.company ? ` · ${b.company}` : ""}</div>
+        <div style={{ fontSize: 12, color: c.muted }}>{b.member}{b.company ? " · " + b.company : ""}</div>
       </div>
       <div style={{ textAlign: "right" }}>
         <div style={{ fontSize: 13, fontWeight: 500 }}>{b.start}–{b.end}</div>
@@ -110,7 +116,7 @@ function BookingRow({ b }) {
 function DayPassRow({ dp }) {
   const ci = dp.status === "checked-in";
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 20px", borderBottom: `1px solid ${c.border}` }}>
+    <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 20px", borderBottom: "1px solid " + c.border }}>
       <div style={{ width: 32, height: 32, borderRadius: "50%", background: ci ? c.greenLight : c.amberLight, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, color: ci ? c.green : c.amber, flexShrink: 0 }}>
         {dp.name.charAt(0)}
       </div>
@@ -126,8 +132,8 @@ function DayPassRow({ dp }) {
 // ── CARD ──────────────────────────────────────────────────────────────────────
 function Card({ title, count, col, bg, loading, children }) {
   return (
-    <div style={{ background: c.surface, border: `1px solid ${c.border}`, borderRadius: 12, marginBottom: 16, overflow: "hidden" }}>
-      <div style={{ padding: "14px 20px", borderBottom: `1px solid ${c.border}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+    <div style={{ background: c.surface, border: "1px solid " + c.border, borderRadius: 12, marginBottom: 16, overflow: "hidden" }}>
+      <div style={{ padding: "14px 20px", borderBottom: "1px solid " + c.border, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <span style={{ fontSize: 13, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: c.muted }}>{title}</span>
         <Badge col={col} bg={bg}>{loading ? "…" : count}</Badge>
       </div>
@@ -141,7 +147,7 @@ function Empty({ msg }) {
 }
 
 function ErrorBox({ msg }) {
-  return <div style={{ background: c.redLight, border: `1px solid ${c.red}`, borderRadius: 8, padding: "12px 16px", marginBottom: 16, fontSize: 13, color: c.red }}>⚠ {msg}</div>;
+  return <div style={{ background: c.redLight, border: "1px solid " + c.red, borderRadius: 8, padding: "12px 16px", marginBottom: 16, fontSize: 13, color: c.red }}>⚠ {msg}</div>;
 }
 
 // ── VIEWS ─────────────────────────────────────────────────────────────────────
@@ -153,10 +159,10 @@ function DayView({ date, bookings, passes, loading, error }) {
       <div style={{ fontFamily: "'DM Serif Display', Georgia, serif", fontSize: 26, fontWeight: 400, marginBottom: 4 }}>{formatDateLong(date)}</div>
       <div style={{ fontSize: 13, color: c.muted, marginBottom: 20 }}>Daily summary · StoryLabs</div>
       {error && <ErrorBox msg={error} />}
-      <Card title="Conference Room Bookings" count={`${b.length} booking${b.length !== 1 ? "s" : ""}`} col={c.accent} bg={c.accentLight} loading={loading}>
+      <Card title="Conference Room Bookings" count={b.length + " booking" + (b.length !== 1 ? "s" : "")} col={c.accent} bg={c.accentLight} loading={loading}>
         {b.length === 0 ? <Empty msg="No bookings today" /> : b.map(x => <BookingRow key={x.id} b={x} />)}
       </Card>
-      <Card title="Day Pass Visitors" count={`${p.length} visitor${p.length !== 1 ? "s" : ""}`} col={c.green} bg={c.greenLight} loading={loading}>
+      <Card title="Day Pass Visitors" count={p.length + " visitor" + (p.length !== 1 ? "s" : "")} col={c.green} bg={c.greenLight} loading={loading}>
         {p.length === 0 ? <Empty msg="No day pass visitors today" /> : p.map(x => <DayPassRow key={x.id} dp={x} />)}
       </Card>
     </div>
@@ -180,19 +186,19 @@ function WeekView({ weekDates, bookings, passes, loading, error, onSelectDay }) 
           const db = bookings.filter(x => x.date === d && x.status !== "cancelled");
           const dp = passes.filter(x => x.date === d);
           return (
-            <div key={d} onClick={() => onSelectDay(d)} style={{ borderRadius: 10, border: `1px solid ${isToday ? c.accent : c.border}`, background: isToday ? c.accentLight : c.surface, padding: "12px 10px", minHeight: 100, cursor: "pointer" }}>
+            <div key={d} onClick={() => onSelectDay(d)} style={{ borderRadius: 10, border: "1px solid " + (isToday ? c.accent : c.border), background: isToday ? c.accentLight : c.surface, padding: "12px 10px", minHeight: 100, cursor: "pointer" }}>
               <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: isToday ? c.accent : c.muted, marginBottom: 4 }}>{DAY_LABELS[i]}</div>
               <div style={{ fontSize: 20, fontFamily: "'DM Serif Display', Georgia, serif", color: isToday ? c.accent : c.text, marginBottom: 8 }}>{new Date(d + "T12:00:00").getDate()}</div>
               {loading ? <Pip col={c.muted} bg={c.border}>…</Pip> : <>
-                {db.length > 0 && <Pip col={c.accent} bg={c.accentLight}>{db.length} room{db.length > 1 ? "s" : ""}</Pip>}
-                {dp.length > 0 && <Pip col={c.green} bg={c.greenLight}>{dp.length} pass{dp.length > 1 ? "es" : ""}</Pip>}
+                {db.length > 0 && <Pip col={c.accent} bg={c.accentLight}>{db.length + " room" + (db.length > 1 ? "s" : "")}</Pip>}
+                {dp.length > 0 && <Pip col={c.green} bg={c.greenLight}>{dp.length + " pass" + (dp.length > 1 ? "es" : "")}</Pip>}
               </>}
             </div>
           );
         })}
       </div>
 
-      <Card title="Conference Room Bookings — This Week" count={`${wb.length} total`} col={c.accent} bg={c.accentLight} loading={loading}>
+      <Card title="Conference Room Bookings — This Week" count={wb.length + " total"} col={c.accent} bg={c.accentLight} loading={loading}>
         {wb.length === 0 ? <Empty msg="No bookings this week" /> : wb.map(x => (
           <div key={x.id}>
             <div style={{ padding: "4px 20px 0", fontSize: 11, fontWeight: 600, color: c.muted, textTransform: "uppercase", letterSpacing: "0.08em" }}>{formatDateShort(x.date)}</div>
@@ -201,7 +207,7 @@ function WeekView({ weekDates, bookings, passes, loading, error, onSelectDay }) 
         ))}
       </Card>
 
-      <Card title="Day Pass Visitors — This Week" count={`${wp.length} visitors`} col={c.green} bg={c.greenLight} loading={loading}>
+      <Card title="Day Pass Visitors — This Week" count={wp.length + " visitors"} col={c.green} bg={c.greenLight} loading={loading}>
         {wp.length === 0 ? <Empty msg="No day pass visitors this week" /> : wp.map(x => (
           <div key={x.id}>
             <div style={{ padding: "4px 20px 0", fontSize: 11, fontWeight: 600, color: c.muted, textTransform: "uppercase", letterSpacing: "0.08em" }}>{formatDateShort(x.date)}</div>
@@ -256,7 +262,6 @@ export default function App() {
   return (
     <div style={{ fontFamily: "'DM Sans', 'Helvetica Neue', sans-serif", background: c.bg, minHeight: "100vh", color: c.text }}>
 
-      {/* Header */}
       <div style={{ background: c.accent, padding: "0 32px", display: "flex", alignItems: "center", justifyContent: "space-between", height: 64 }}>
         <div>
           <span style={{ fontFamily: "'DM Serif Display', Georgia, serif", fontSize: 20, color: "#fff" }}>StoryLabs</span>
@@ -267,25 +272,22 @@ export default function App() {
         </div>
       </div>
 
-      {/* Nav */}
-      <div style={{ background: c.surface, borderBottom: `1px solid ${c.border}`, padding: "0 32px", display: "flex", alignItems: "center", gap: 4, height: 48 }}>
+      <div style={{ background: c.surface, borderBottom: "1px solid " + c.border, padding: "0 32px", display: "flex", alignItems: "center", gap: 4, height: 48 }}>
         {["day", "week"].map(v => (
           <button key={v} onClick={() => setView(v)} style={{ ...btn, padding: "6px 16px", borderRadius: 6, background: view === v ? c.accent : "transparent", color: view === v ? "#fff" : c.muted, fontSize: 13, fontWeight: 500, textTransform: "capitalize" }}>{v}</button>
         ))}
         <div style={{ flex: 1 }} />
-        <button onClick={() => setSelectedDate(fmt(TODAY))} style={{ ...btn, fontSize: 12, fontWeight: 500, padding: "4px 12px", borderRadius: 6, border: `1px solid ${c.border}`, background: c.surface, color: c.muted }}>Today</button>
+        <button onClick={() => setSelectedDate(fmt(TODAY))} style={{ ...btn, fontSize: 12, fontWeight: 500, padding: "4px 12px", borderRadius: 6, border: "1px solid " + c.border, background: c.surface, color: c.muted }}>Today</button>
       </div>
 
-      {/* Date nav */}
       <div style={{ maxWidth: 900, margin: "0 auto", padding: "28px 24px 0" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 24 }}>
-          <button onClick={() => shift(-1)} style={{ ...btn, width: 32, height: 32, border: `1px solid ${c.border}`, borderRadius: 8, background: c.surface, color: c.muted, fontSize: 16 }}>‹</button>
-          <button onClick={() => shift(1)} style={{ ...btn, width: 32, height: 32, border: `1px solid ${c.border}`, borderRadius: 8, background: c.surface, color: c.muted, fontSize: 16 }}>›</button>
+          <button onClick={() => shift(-1)} style={{ ...btn, width: 32, height: 32, border: "1px solid " + c.border, borderRadius: 8, background: c.surface, color: c.muted, fontSize: 16 }}>‹</button>
+          <button onClick={() => shift(1)} style={{ ...btn, width: 32, height: 32, border: "1px solid " + c.border, borderRadius: 8, background: c.surface, color: c.muted, fontSize: 16 }}>›</button>
           {view === "week" && <span style={{ fontSize: 13, color: c.muted }}>{formatDateShort(weekDates[0])} – {formatDateShort(weekDates[6])}</span>}
         </div>
       </div>
 
-      {/* Content */}
       <div style={{ maxWidth: 900, margin: "0 auto", padding: "0 24px 40px" }}>
         {view === "day" && <DayView date={selectedDate} bookings={bookings} passes={passes} loading={loading} error={error} />}
         {view === "week" && <WeekView weekDates={weekDates} bookings={bookings} passes={passes} loading={loading} error={error} onSelectDay={(d) => { setSelectedDate(d); setView("day"); }} />}
